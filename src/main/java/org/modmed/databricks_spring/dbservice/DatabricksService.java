@@ -28,7 +28,6 @@ public class DatabricksService {
         """;
         ResponseEntity<Map> response = restTemplate.postForEntity(runNowUrl, new HttpEntity<>(payload, headers), Map.class);
         Long parentRunId = ((Number) response.getBody().get("run_id")).longValue();
-        System.out.println("parentRunId: " + parentRunId);
 
         // STEP 2: Poll top-level job status to get task run_id
         String runGetUrl = host + "/api/2.1/jobs/runs/get?run_id=" + parentRunId;
@@ -46,7 +45,6 @@ public class DatabricksService {
                     throw new RuntimeException("No tasks found in run.");
                 }
                 taskRunId = ((Number) tasks.get(0).get("run_id")).longValue();
-                System.out.println("TaskRunId: " + taskRunId);
                 break;
             }
 
@@ -56,27 +54,17 @@ public class DatabricksService {
         if (taskRunId == null) {
             throw new RuntimeException("Failed to extract task run_id.");
         }
-        //before this you have to create a notebook with a query
-        // then create a job in job-run->jobs & pipeline
-        //give task name
-        // STEP 3: Get notebook_output from task run_id
-        String taskRunUrl = host + "/api/2.1/jobs/runs/get-output?run_id=" + taskRunId;//changed here from get to get-output coz we want
-        //the output of the current task, if any error go to databricks and check the job run
-        System.out.println("taskRunUrl: " + taskRunUrl);
-        ResponseEntity<Map> taskResp = restTemplate.exchange(taskRunUrl, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
 
+        // STEP 3: Get notebook_output from task run_id
+        String taskRunUrl = host + "/api/2.1/jobs/runs/get-output?run_id=" + taskRunId;
+        ResponseEntity<Map> taskResp = restTemplate.exchange(taskRunUrl, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
         Map<String, Object> notebookOutput = (Map<String, Object>) taskResp.getBody().get("notebook_output");
         if (notebookOutput == null || notebookOutput.get("result") == null) {
             throw new RuntimeException("Notebook did not return any output.");
         }
-
         String result = (String) notebookOutput.get("result");
-        System.out.println("result: " + result);
-
         // STEP 4: Parse and return JSON
         ObjectMapper mapper = new ObjectMapper();
-        System.out.println(response.getStatusCode());
-        System.out.println(response.getBody());
         return mapper.readValue(result, new TypeReference<>() {});
 
     }
